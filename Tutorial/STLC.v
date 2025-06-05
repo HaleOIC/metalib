@@ -120,18 +120,14 @@ Definition demo_rep2 := abs typ_base (abs typ_base (app 0 1)).
 
 *)
 
-(** <<
+Definition two := abs (typ_arrow typ_base typ_base) 
+                    (abs typ_base (app 1 (app 1 0))).
 
-Definition two :=
-  (* FILL IN HERE *)
+Definition COMB_K := abs typ_base (abs typ_base 0).
 
-Definition COMB_K :=
-  (* FILL IN HERE *)
-
-Definition COMB_S :=
-   (* FILL IN HERE *)
-
->> *)
+Definition COMB_S := abs (typ_arrow (typ_arrow typ_base typ_base) typ_base)
+                      (abs (typ_arrow typ_base typ_base)
+                        (abs typ_base (app 2 (app 0 (app 1 0))))).
 
 (** There are two important advantages of the locally nameless
     representation:
@@ -233,12 +229,20 @@ Qed.
 Lemma subst_eq_var: forall (x : atom) u,
   [x ~> u]x = u.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  simpl. intros. 
+  destruct (x == x).
+  - reflexivity.
+  - contradiction.
+Qed. 
 
 Lemma subst_neq_var : forall (x y : atom) u,
   y <> x -> [x ~> u]y = y.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. simpl.
+  destruct (y == x).
+  - contradiction.
+  - reflexivity.
+Qed.
 
 
 (*************************************************************************)
@@ -310,7 +314,19 @@ Qed.
 Lemma subst_fresh : forall (x : atom) e u,
   x `notin` fv e -> [x ~> u] e = e.
 Proof.
-  (* FILL IN HERE (and delete "Admitted") *) Admitted.
+  intros. induction e.
+  - simpl. reflexivity.
+  - simpl. destruct (a == x).
+    + rewrite e in H. simpl in H. fsetdec.
+    + reflexivity.
+  - simpl in H. apply IHe in H. clear IHe. simpl. rewrite H. reflexivity.
+  - simpl in H. 
+    assert (H': x `notin` union (fv e1) (fv e2) <-> x `notin` fv e1 /\ x `notin` fv e2).
+    + split; auto.
+    + apply H' in H. destruct H.
+      apply IHe1 in H. apply IHe2 in H0. clear IHe1 IHe2.
+      simpl. rewrite H. rewrite H0. reflexivity.
+Qed.
 
 (* Take-home Demo: Prove that free variables are not introduced by
    substitution.
@@ -416,7 +432,10 @@ Lemma demo_open :
   open (app (abs typ_base (app 1 0)) 0) Y =
        (app (abs typ_base (app Y 0)) Y).
 Proof.
-Admitted.
+  unfold open.
+  simpl.
+  reflexivity.
+Qed.
 (* HINT for demo: To show the equality of the two sides below, use the
    tactics [unfold], which replaces a definition with its RHS and
    reduces it to head form, and [simpl], which reduces the term the
@@ -541,34 +560,12 @@ Lemma open_rec_lc_core : forall e j v i u,
   e = {i ~> u} e.
 Proof.
   induction e; intros j v i u Neq H; simpl in *.
-  Case "bvar".
-    destruct (j == n);  destruct (i == n).
-      SCase "j = n = i".
-        subst n. destruct Neq. auto.
-      SCase "j = n, i <> n".
-        auto.
-      SCase "j <> n, i = n".
-        subst n. simpl in H.
-        destruct (i == i).
-           SSCase "i=i".
-             auto.
-           SSCase "i<>i".
-             destruct n. auto.
-      SCase "j <> n, i <> n".
-        auto.
-  Case "fvar".
-    auto.
-  Case "abs".
-    f_equal.
-    inversion H.
-    apply  IHe with (j := S j) (u := u) (i := S i) (v := v).
-    auto.
-    auto.
-  Case "app".
-    inversion H.
-    f_equal.
-    eapply IHe1; eauto.
-    eapply IHe2; eauto.
+  - destruct (j == n); destruct (i == n); auto; subst n. contradiction.
+    simpl in H. destruct (i == i); subst; auto. contradiction.
+  - reflexivity.
+  - f_equal. inversion H. apply IHe with (j := S j) (u := u) (i := S i) (v := v).
+    auto. auto.
+  - inversion H. f_equal. eapply IHe1; eauto. eapply IHe2; eauto.
 Qed.
 
 (* Take-home Exercise: We've proven the above lemma very explicitly,
@@ -621,7 +618,15 @@ Lemma subst_open_rec : forall e1 e2 u (x : atom) k,
   lc u ->
   [x ~> u] ({k ~> e2} e1) = {k ~> [x ~> u] e2} ([x ~> u] e1).
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros e1. induction e1; subst; intros.
+  - simpl. destruct (k == n); subst; auto.
+  - simpl. destruct (a == x); subst; auto.
+    apply open_rec_lc. assumption.
+  - simpl. f_equal. apply IHe1. assumption.
+  - simpl. f_equal. 
+    + apply IHe1_1. assumption.
+    + apply IHe1_2. assumption.
+Qed.
 
 
 (** *** Exercise [subst_open_var] *)
@@ -640,25 +645,34 @@ Lemma subst_open_var : forall (x y : atom) u e,
   lc u ->
   open ([x ~> u] e) y = [x ~> u] (open e y).
 Proof.
-  (* FILL IN HERE (and delete "Admitted") *) Admitted.
+  intros. unfold open in *. 
+  apply (subst_open_rec e y u x 0) in H0. rewrite H0.
+  apply (subst_neq_var x y u) in H. rewrite H. reflexivity.
+Qed.
 
 (** *** Take-home Exercise [subst_intro] *)
 
 (** This lemma states that opening can be replaced with variable
     opening and substitution.
-
-    HINT: Prove by induction on [e], first generalizing the
-    argument to [open_rec] by using the [generalize] tactic, e.g.,
-    [generalize 0].
-
 *)
 
 Lemma subst_intro : forall (x : atom) u e,
   x `notin` (fv e) ->
   open e u = [x ~> u](open e x).
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
-
+  intros. unfold open in *. 
+  generalize 0. induction e; subst; intros; simpl.
+  - destruct (n0 == n); subst; simpl.
+    + destruct (x == x); subst; auto. contradiction.
+    + reflexivity.
+  - destruct (a == x); subst.
+    + simpl in H. fsetdec.
+    + reflexivity.
+  - f_equal. apply IHe. assumption.
+  - f_equal; simpl in H. 
+    + apply IHe1. auto.
+    + apply IHe2. auto.
+Qed.
 End BasicOperations.
 
 
@@ -809,14 +823,29 @@ Lemma subst_open_rec_c : forall e1 e2 u (x : atom) k,
   lc_c u ->
   [x ~> u] ({k ~> e2} e1) = {k ~> [x ~> u] e2} ([x ~> u] e1).
 Proof.
-(* OPTIONAL EXERCISE *) Admitted.
+  intros. generalize dependent k.
+  induction e1; subst; simpl.
+  - intros. destruct (k == n); subst; auto.
+  - intros. destruct (a == x); subst; auto.
+    eapply open_rec_lc_c. assumption.
+  - intros. f_equal. apply IHe1.
+  - intros. f_equal. apply IHe1_1. apply IHe1_2.
+Qed. 
 
 Lemma subst_open_var_c : forall (x y : atom) u e,
   y <> x ->
   lc_c u ->
   open ([x ~> u] e) y = [x ~> u] (open e y).
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. unfold open in *. generalize 0. 
+  induction e; subst; simpl; intros.
+  - destruct (n0 == n); subst; auto. simpl. destruct (y == x); subst.
+    + contradiction.
+    + reflexivity.
+  - destruct (a == x); subst; auto. symmetry. eapply open_rec_lc_c. assumption.
+  - f_equal. apply IHe.
+  - f_equal. apply IHe1. apply IHe2.
+Qed.
 
 (* Exercise [subst_lc_c]:
 
@@ -836,14 +865,13 @@ Proof.
   intros x u e He Hu.
   induction He.
   Case "lc_var_c".
-   simpl.
-   destruct (x0 == x).
-     auto.
-     auto.
+    simpl. destruct (x0 == x); auto.
   Case "lc_abs_c".
-    simpl.
-    (* FILL IN HERE (and delete "Admitted") *) Admitted.
-
+    simpl. apply lc_abs_c with (L := L `union` singleton x). intros.
+    rewrite subst_open_var_c; auto.
+  Case "lc_app_c".
+    simpl. eapply lc_app_c. assumption. assumption.
+Qed.
 End CofiniteQuantification.
 
 
@@ -1210,15 +1238,18 @@ Admitted.
 Lemma typing_c_weakening_strengthened :  forall (E F G : env) e T,
   typing_c (G ++ E) e T ->
   uniq (G ++ F ++ E) ->
-  typing_c (G ++ F ++ E) e T.
+  typing_c (G ++ F ++ E) e T.  
 Proof.
   intros E F G e T H.
   remember (G ++ E) as E'.
   generalize dependent G.
   induction H; intros G Eq Uniq; subst.
- (* FILL IN HERE (and delete "Admitted") *) Admitted.
-
-
+  - eapply typing_var_c. apply Uniq. auto.
+  - pick fresh x' and apply typing_abs_c.
+    rewrite_env ((x' ~ T1 ++ G)++ F ++ E). apply H0. auto. auto. 
+    simpl_env. eapply uniq_push. auto. auto.
+  - eapply typing_app_c. auto. auto.
+Qed.
 
 (** *** Example
 
@@ -1291,8 +1322,14 @@ Lemma typing_subst_var_case : forall (E F : env) u S T (z x : atom),
   typing_c (F ++ E) ([z ~> u] x) T.
 Proof.
   intros E F u S T z x H J K.
-  simpl.
- (* FILL IN HERE (and delete "Admitted") *) Admitted.
+  simpl. destruct (x == z); subst.
+  - apply binds_mid_eq in H. rewrite H. eapply typing_c_weakening. auto.
+    + eapply uniq_remove_mid. apply J.
+    + auto.
+  - eapply typing_var_c. 
+    + eapply uniq_remove_mid. apply J.
+    + eapply binds_remove_mid. apply H. auto.
+Qed.
 
 (** *** Note
 
@@ -1340,8 +1377,17 @@ Lemma typing_c_subst : forall (E F : env) e u S T (z : atom),
   typing_c E u S ->
   typing_c (F ++ E) ([z ~> u] e) T.
 Proof.
-(* FILL IN HERE (and delete "Admitted") *) Admitted.
-
+  intros. remember (F ++ z ~ S ++ E) as E'.
+  generalize dependent F. induction H; subst.
+  - intros. apply typing_subst_var_case with (S := S); subst E0.
+    auto. auto. auto.
+  - intros. simpl. pick fresh x and apply typing_abs_c.
+    rewrite subst_open_var_c. rewrite_env ((x ~ T1 ++ F) ++ E).
+    eapply H1. auto. simpl_env. subst E0. reflexivity.
+    auto. eapply typing_c_to_lc_c. apply H0.
+  - intros. simpl. eapply typing_app_c. apply IHtyping_c1. auto.
+    apply IHtyping_c2. auto.
+Qed.
 
 (** *** Exercise
 
@@ -1357,7 +1403,10 @@ Lemma typing_c_subst_simple : forall (E : env) e u S T (z : atom),
   typing_c E u S ->
   typing_c E ([z ~> u] e) T.
 Proof.
-(* FILL IN HERE (and delete "Admitted") *) Admitted.
+  intros. rewrite_env (nil ++ E). eapply typing_c_subst.
+  - simpl_env. apply H.
+  - auto.
+Qed.
 
 (*************************************************************************)
 (** * Values and Evaluation *)
@@ -1450,7 +1499,13 @@ Proof.
   intros E e e' T H.
   generalize dependent e'.
   induction H; intros e' J.
-(* OPTIONAL EXERCISE *) Admitted.
+  - inversion J.
+  - inversion J.
+  - inversion J; subst; eauto.
+    + inversion H; subst. pick fresh x'.
+      rewrite (subst_intro x'). eapply typing_c_subst_simple.
+      apply H4. auto. apply H0. auto.
+Qed.
 
 (*************************************************************************)
 (** * Progress *)
@@ -1511,8 +1566,23 @@ Proof.
   remember (@nil (atom * typ)) as E.
 
   induction H; subst.
-
-(* FILL IN HERE (and delete "Admitted") *) Admitted.
+  - Case "typing_var_c".
+    inversion H1.
+  - Case "typing_abs_c".
+    left. apply value_abs_c. eapply typing_c_to_lc_c. apply H0.
+  - Case "typing_app_c".
+    apply IHtyping_c1 in H; auto. apply IHtyping_c2 in H1; auto.
+    clear IHtyping_c1. clear IHtyping_c2.
+    destruct H1; destruct H.
+    + inversion H; subst. right. exists (open e e2). auto.
+    + destruct H as [e' H]; subst. right. exists (app e' e2). 
+      apply eval_app_1_c; auto. inversion H1; subst. auto.
+    + destruct H1 as [e' H1]; subst. right. exists (app e1 e').
+      apply eval_app_2_c; auto.
+    + destruct H as [e' H]; subst. right. exists (app e' e2). 
+      apply eval_app_1_c; auto. inversion H0; subst. 
+      eapply typing_c_to_lc_c. apply H7.
+Qed. 
 
 
 (*************************************************************************)
@@ -1662,7 +1732,9 @@ Qed.
 (* Take-home exercise. *)
 Lemma lc_c_to_lc : forall e, lc_c e -> lc e.
 Proof.
-(* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; auto. 
+  pick fresh x. eapply lc_abs; auto.
+Qed.
 
 (** Correspondence of typing and typing_c *)
 
@@ -1681,7 +1753,9 @@ Qed.
 Lemma typing_c_to_typing : forall E e T,
   typing_c E e T -> typing E e T.
 Proof.
-(* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; subst; eauto.
+  - pick fresh x. eapply typing_abs; auto.
+Qed.
 
 (* Demo. The pattern [eauto using lemma] is a powerful way to completely
    automate all of the cases of a simple proof. *)
@@ -1696,7 +1770,9 @@ Qed.
 Lemma value_c_to_value : forall e,
   value_c e -> value e.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; auto.
+  eauto using lc_c_to_lc.
+Qed.
 
 (* Demo: We can do the same trick with several lemmas. *)
 Lemma eval_to_eval_c : forall e e',
@@ -1710,7 +1786,9 @@ Qed.
 Lemma eval_c_to_eval : forall e e',
   eval_c e e' -> eval e e'.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; auto;
+  eauto using lc_c_to_lc, value_c_to_value.
+Qed.
 
 Lemma preservation : forall E e e' T,
   typing E e T ->
@@ -1765,7 +1843,10 @@ Lemma open_abs : forall e u T1,
   lc u ->
   lc (open e u).
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. inversion H; subst; auto.
+  rewrite (subst_intro x); auto.
+  apply subst_lc; auto.
+Qed.
 
 
 (* Take-home exercise:
@@ -1776,17 +1857,22 @@ Proof.
 Lemma value_to_lc : forall e,
   value e -> lc e.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; auto.
+Qed.
 
 Lemma eval_to_lc : forall e1 e2,
   eval e1 e2 -> lc e1 /\ lc e2.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; auto;
+  try inversion IHeval; split; 
+  eauto using value_to_lc, open_abs.
+Qed.
 
 Lemma typing_to_lc : forall E e T,
   typing E e T -> lc e.
 Proof.
-  (* OPTIONAL EXERCISE *) Admitted.
+  intros. induction H; eauto.
+Qed.
 
 (*************************************************************************)
 (** * Decidability of Typechecking *)
@@ -1817,7 +1903,13 @@ Lemma typing_c_unique : forall E e T1 T2,
   typing_c E e T2 ->
   T1 = T2.
 Proof.
-(* OPTIONAL EXERCISE *) Admitted.
+  intros. generalize dependent T2.
+  induction H; subst; intros; inversion H1; subst.
+  - eapply binds_unique; eauto.
+  - f_equal. pick fresh x'. eapply H0; auto.
+  - assert (typ_arrow T1 T2 = typ_arrow T3 T0) by auto.
+    inversion H2; eauto.
+Qed.
 
 
 (* A property P is decidable if we can show the proposition P \/ ~P. *)
